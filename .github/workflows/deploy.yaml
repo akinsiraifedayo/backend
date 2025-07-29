@@ -42,7 +42,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: true
-          file: ./backend/Dockerfile
+          file: ./
           tags: |
             ${{ vars.DOCKERHUB_USERNAME }}/bankapp:latest
             ${{ vars.DOCKERHUB_USERNAME }}/bankapp:${{ needs.prepare.outputs.version }}
@@ -60,11 +60,6 @@ jobs:
           username: ${{ secrets.SSH_SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            docker pull ${{ vars.DOCKERHUB_USERNAME }}/bankapp:latest
-            docker stop bankapp || true
-            docker rm bankapp || true
-            docker run -d \
-              --name bankapp \
-              -p 443:443 \
-              -v /etc/ssl/certs/private:/etc/ssl/certs/private \
-              ${{ vars.DOCKERHUB_USERNAME }}/bankapp:latest
+            cd ~/backend
+            git pull origin main
+            docker compose --file docker-compose.prod.yml up -d --build

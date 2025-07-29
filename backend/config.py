@@ -10,9 +10,7 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = (
-            ".env.prod" 
-            if os.getenv("ENV", "dev").lower() == "prod" 
-            else ".env.dev"
+            ".env"
         )
         env_file_encoding = 'utf-8'
 
