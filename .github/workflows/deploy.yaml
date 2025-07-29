@@ -1,0 +1,70 @@
+name: Deploy with Volume-Mounted Certs
+
+on:
+  workflow_run:
+    workflows: ['test']
+    types:
+      - completed
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.versioning.outputs.version }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Extract version
+        id: versioning
+        run: |
+          VERSION=$(grep '^version\s*=' pyproject.toml | cut -d '"' -f2)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+  build:
+    needs: prepare
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          file: ./backend/Dockerfile
+          tags: |
+            ${{ vars.DOCKERHUB_USERNAME }}/bankapp:latest
+            ${{ vars.DOCKERHUB_USERNAME }}/bankapp:${{ needs.prepare.outputs.version }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_SERVER_HOST }}
+          username: ${{ secrets.SSH_SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            docker pull ${{ vars.DOCKERHUB_USERNAME }}/bankapp:latest
+            docker stop bankapp || true
+            docker rm bankapp || true
+            docker run -d \
+              --name bankapp \
+              -p 443:443 \
+              -v /etc/ssl/certs/private:/etc/ssl/certs/private \
+              ${{ vars.DOCKERHUB_USERNAME }}/bankapp:latest

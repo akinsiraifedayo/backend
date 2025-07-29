@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: mydatabase
+    ports:
+      - "5432:5432"
+    command:
+      
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myuser -d mydatabase"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pythonapp:
+    image: djangowiz/bankapp:latest
+    build: ./
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://myuser:${DB_PASSWORD}@db:5432/mydatabase
+    volumes:
+      - /etc/ssl/certs/private/:/etc/ssl/certs/private/
+
+      
+volumes:
+  postgres_data:
+
+
+
+
+  

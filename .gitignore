@@ -1,0 +1,12 @@
+# sample files
+setup-on-cloudflare.md
+old_workflows/
+
+.pytest*
+__pycache*
+venv
+./app/__pycache__
+./app/.pytest_cache
+.env
+.env.*
+backups/*
