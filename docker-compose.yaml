@@ -20,7 +20,7 @@ services:
 
   pythonapp:
     image: djangowiz/bankapp:latest
-    build: ./
+    build: ./Dockerfile
     depends_on:
       - db
     ports:
