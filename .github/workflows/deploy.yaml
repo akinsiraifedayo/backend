@@ -61,38 +61,31 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: production
-    
-    steps:
-      - name: Configure SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan ${{ secrets.SSH_SERVER_HOST }} >> ~/.ssh/known_hosts
       
-      - name: Secure Deploy
+    steps:
+      - name: Deploy to Production
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SSH_SERVER_HOST }}
           username: ${{ secrets.SSH_SERVER_USER }}
-          key: ~/.ssh/deploy_key
+          key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             set -euxo pipefail
             cd ~/backend
             
-            # Verify deployment integrity
+            # Update code
             git fetch origin
-            [ "$(git rev-parse origin/main)" == "$(git rev-parse HEAD)" ] || exit 1
+            git reset --hard origin/main
             
-            # Atomic deployment
-            docker compose -f docker-compose.prod.yaml pull
-            docker compose -f docker-compose.prod.yaml up -d \
+            # Deploy containers
+            docker compose -f docker-compose.yaml pull
+            docker compose -f docker-compose.yaml up -d \
               --force-recreate \
               --remove-orphans
             
-            # Health verification
+            # Verify deployment
             docker ps --filter "name=bankapp" | grep -q "Up" || exit 1
             curl -fsS https://localhost/healthcheck || exit 1
             
-            # Cleanup
+            # Cleanup old images
             docker image prune -af --filter "until=24h"
