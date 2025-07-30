@@ -1,4 +1,4 @@
-name: Deploy with Volume-Mounted Certs
+name: Production Deployment
 
 on:
   workflow_run:
@@ -11,19 +11,20 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.versioning.outputs.version }}
-      commit_sha: ${{ steps.versioning.outputs.commit_sha }}
+      commit_sha: ${{ steps.sha.outputs.commit_sha }}
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       
       - name: Extract version
         id: versioning
         run: |
-          VERSION=$(grep '^version\s*=' pyproject.toml | cut -d '"' -f2)
+          VERSION=$(grep -m1 '^version\s*=' pyproject.toml | cut -d '"' -f2)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-
+      
       - name: Get commit SHA
         id: sha
         run: |
@@ -50,11 +51,11 @@ jobs:
           push: true
           tags: |
             ${{ vars.DOCKERHUB_USERNAME }}/bankapp:latest
-            
+            ${{ vars.DOCKERHUB_USERNAME }}/bankapp:${{ needs.prepare.outputs.version }}
+            ${{ vars.DOCKERHUB_USERNAME }}/bankapp:sha-${{ needs.prepare.outputs.commit_sha }}
           build-args: |
             COMMIT_SHA=${{ needs.prepare.outputs.commit_sha }}
             BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-
 
   deploy:
     needs: build
@@ -62,25 +63,36 @@ jobs:
     environment: production
     
     steps:
-      - name: Deploy to Server via SSH
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan ${{ secrets.SSH_SERVER_HOST }} >> ~/.ssh/known_hosts
+      
+      - name: Secure Deploy
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SSH_SERVER_HOST }}
           username: ${{ secrets.SSH_SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
+          key: ~/.ssh/deploy_key
           script: |
+            set -euxo pipefail
             cd ~/backend
-
+            
+            # Verify deployment integrity
             git fetch origin
-            git checkout main
-            git reset --hard origin/main
-
-            # Deploy with Docker Compose
-            docker compose --file docker-compose.yaml pull
-            docker compose --file docker-compose.yaml up -d \
+            [ "$(git rev-parse origin/main)" == "$(git rev-parse HEAD)" ] || exit 1
+            
+            # Atomic deployment
+            docker compose -f docker-compose.prod.yaml pull
+            docker compose -f docker-compose.prod.yaml up -d \
               --force-recreate \
-              --remove-orphans \
-              --no-deps
-
-            docker ps
+              --remove-orphans
+            
+            # Health verification
+            docker ps --filter "name=bankapp" | grep -q "Up" || exit 1
+            curl -fsS https://localhost/healthcheck || exit 1
+            
+            # Cleanup
             docker image prune -af --filter "until=24h"
