@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.versioning.outputs.version }}
+      commit_sha: ${{ steps.versioning.outputs.commit_sha }}
     
     steps:
       - name: Checkout code
@@ -26,7 +27,7 @@ jobs:
       - name: Get commit SHA
         id: sha
         run: |
-          echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "commit_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
   build:
     needs: prepare
