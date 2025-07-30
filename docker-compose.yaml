@@ -13,26 +13,32 @@ services:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U myuser -d mydatabase"]
+      test: >
+        bash -c 
+        "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
       interval: 5s
       timeout: 5s
       retries: 5
 
   pythonapp:
     image: djangowiz/bankapp:latest
-    build: ./Dockerfile
+    build:
+      context: .
+      dockerfile: Dockerfile
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
       - "443:443"
     environment:
       DATABASE_URL: postgresql+asyncpg://myuser:${DB_PASSWORD}@db:5432/mydatabase
     volumes:
-      - /etc/ssl/certs/private/:/etc/ssl/certs/private/
+      - ssl_certs:/etc/ssl/certs/private/
 
       
 volumes:
   postgres_data:
+  ssl_certs:
 
 
 
