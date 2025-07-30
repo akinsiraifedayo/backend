@@ -21,7 +21,11 @@ jobs:
         run: |
           VERSION=$(grep '^version\s*=' pyproject.toml | cut -d '"' -f2)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Get commit SHA
+        id: sha
+        run: |
+          echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
   build:
     needs: prepare
@@ -45,6 +49,11 @@ jobs:
           tags: |
             ${{ vars.DOCKERHUB_USERNAME }}/bankapp:latest
             ${{ vars.DOCKERHUB_USERNAME }}/bankapp:${{ needs.prepare.outputs.version }}
+            ${{ vars.DOCKERHUB_USERNAME }}/bankapp:${{ needs.prepare.outputs.commit_sha }}
+          build-args: |
+            COMMIT_SHA=${{ needs.prepare.outputs.commit_sha }}
+            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
 
   deploy:
     needs: build
@@ -60,5 +69,17 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             cd ~/backend
-            git pull origin main
-            docker compose --file docker-compose.prod.yml up -d --build
+
+            git fetch origin
+            git checkout main
+            git reset --hard origin/main
+
+            # Deploy with Docker Compose
+            docker compose --file docker-compose.yaml pull
+            docker compose --file docker-compose.yaml up -d \
+              --force-recreate \
+              --remove-orphans \
+              --no-deps
+
+            docker ps
+            docker image prune -af --filter "until=24h"
