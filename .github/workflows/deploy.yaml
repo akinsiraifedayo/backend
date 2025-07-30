@@ -50,8 +50,7 @@ jobs:
           push: true
           tags: |
             ${{ vars.DOCKERHUB_USERNAME }}/bankapp:latest
-            ${{ vars.DOCKERHUB_USERNAME }}/bankapp:${{ needs.prepare.outputs.version }}
-            ${{ vars.DOCKERHUB_USERNAME }}/bankapp:${{ needs.prepare.outputs.commit_sha }}
+            
           build-args: |
             COMMIT_SHA=${{ needs.prepare.outputs.commit_sha }}
             BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
