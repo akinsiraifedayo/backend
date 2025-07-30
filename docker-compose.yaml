@@ -33,11 +33,10 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://myuser:${DB_PASSWORD}@db:5432/mydatabase
     volumes:
-      - ssl_certs:/etc/ssl/certs/private/
+      - /etc/ssl/certs/private/:/etc/ssl/certs/private/
 
 volumes:
   postgres_data:
-  ssl_certs:
 
 
 
