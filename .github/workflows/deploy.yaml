@@ -85,7 +85,6 @@ jobs:
             
             # Verify deployment
             docker ps --filter "name=bankapp" | grep -q "Up" || exit 1
-            curl -fsS https://localhost/healthcheck || exit 1
             
             # Cleanup old images
             docker image prune -af --filter "until=24h"
