@@ -85,6 +85,7 @@ jobs:
             
             # Verify deployment
             docker ps --filter "name=bankapp" | grep -q "Up" || exit 1
+            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
             
             # Cleanup old images
             docker image prune -af --filter "until=24h"
