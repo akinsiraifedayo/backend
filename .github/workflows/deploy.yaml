@@ -54,6 +54,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Check if docker-compose.yaml changed
         id: check_changes
@@ -74,7 +76,7 @@ jobs:
           username: ${{ secrets.SSH_SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: "docker-compose.yaml"
-          target: "~/backend/docker-compose.yaml"
+          target: "~/backend/"
 
       - name: Deploy to Production
         uses: appleboy/ssh-action@v1.0.0
