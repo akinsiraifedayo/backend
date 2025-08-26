@@ -48,8 +48,13 @@ jobs:
     environment: production
 
     
+
+    
       
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Check if docker-compose.yaml changed
         id: check_changes
         run: |
@@ -60,7 +65,7 @@ jobs:
             echo "docker-compose.yaml changed"
             echo "changed=true" >> $GITHUB_OUTPUT
           fi
-
+      
       - name: Copy docker-compose.yaml to server (if changed)
         if: steps.check_changes.outputs.changed == 'true'
         uses: appleboy/scp-action@v1.0.0
