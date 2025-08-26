@@ -1,29 +1,18 @@
 name: Production Deployment
 
 on:
-  workflow_run:
-    workflows: ['test']
-    types:
-      - completed
+  push:
+    branches: [main]
 
 jobs:
   prepare:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.versioning.outputs.version }}
       commit_sha: ${{ steps.sha.outputs.commit_sha }}
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      
-      - name: Extract version
-        id: versioning
-        run: |
-          VERSION=$(grep -m1 '^version\s*=' pyproject.toml | cut -d '"' -f2)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
       
       - name: Get commit SHA
         id: sha
@@ -51,18 +40,44 @@ jobs:
           push: true
           tags: |
             ${{ vars.DOCKERHUB_USERNAME }}/bankapp:latest
-            ${{ vars.DOCKERHUB_USERNAME }}/bankapp:${{ needs.prepare.outputs.version }}
             ${{ vars.DOCKERHUB_USERNAME }}/bankapp:sha-${{ needs.prepare.outputs.commit_sha }}
-          build-args: |
-            COMMIT_SHA=${{ needs.prepare.outputs.commit_sha }}
-            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
     environment: production
+
+    
+
+    
       
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if docker-compose.yaml changed
+        id: check_changes
+        run: |
+          if git diff --quiet HEAD^ HEAD -- docker-compose.yaml; then
+            echo "docker-compose.yaml unchanged"
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "docker-compose.yaml changed"
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Copy docker-compose.yaml to server (if changed)
+        if: steps.check_changes.outputs.changed == 'true'
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_SERVER_HOST }}
+          username: ${{ secrets.SSH_SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "docker-compose.yaml"
+          target: "~/backend/"
+
       - name: Deploy to Production
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -72,10 +87,6 @@ jobs:
           script: |
             set -euxo pipefail
             cd ~/backend
-            
-            # Update code
-            git fetch origin
-            git reset --hard origin/main
             
             # Deploy containers
             docker compose -f docker-compose.yaml pull
