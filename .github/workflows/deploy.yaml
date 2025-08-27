@@ -6,7 +6,7 @@ on:
 
 jobs:
   prepare:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     outputs:
       commit_sha: ${{ steps.sha.outputs.commit_sha }}
     
