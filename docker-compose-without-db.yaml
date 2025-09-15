@@ -1,40 +1,15 @@
 services:
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: myuser
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: mydatabase
-    ports:
-      - "5432:5432"
-    command:
-      
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
-    restart: unless-stopped
-    healthcheck:
-      test: >
-        bash -c 
-        "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   backend:
     image: djangowiz/bankapp:latest
     container_name: bankapp
     build:
       context: .
       dockerfile: Dockerfile
-    depends_on:
-      db:
-        condition: service_healthy
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql+asyncpg://myuser:${DB_PASSWORD}@db:5432/mydatabase
-      TEST_DATABASE_URL: postgresql+asyncpg://testuser:password@db:5432/testdatabase
+      DATABASE_URL: ${DATABASE_URL}
+      TEST_DATABASE_URL: ${TEST_DATABASE_URL}
     volumes:
       - /etc/ssl/certs/private/:/etc/ssl/certs/private/
     restart: unless-stopped
@@ -63,10 +38,6 @@ services:
       - backend
       - frontend
     restart: unless-stopped
-
-
-volumes:
-  postgres_data:
 
 
 
